@@ -71,7 +71,7 @@ jobs:
             set -e
 
             # Define the project directory on the server for easy reference.
-            PROJECT_DIR="/home/${{ secrets.EC2_USER }}/music-discovery-project"
+            PROJECT_DIR="/home/${{ secrets.EC2_USER }}/music-discovery-backend"
             
             # Create the project directory if it doesn't already exist.
             mkdir -p $PROJECT_DIR
@@ -110,4 +110,4 @@ jobs:
 
             # Restart the application if it's already running, or start it if it's not.
             # This ensures zero-downtime deployments.
-            pm2 restart music-discovery-project || pm2 start server.js --name music-discovery-project
+            pm2 restart music-discovery-backend || pm2 start server.js --name music-discovery-backend
