@@ -1,34 +1,51 @@
-name: Deploy MusicDiscovery App to EC2
+# Name of the workflow, which will appear in the GitHub Actions tab.
+name: Deploy Backend to AWS EC2
 
+# This workflow triggers automatically on any 'push' event to the 'main' branch.
 on:
   push:
     branches:
       - main
 
 jobs:
+  # A job is a set of steps that execute on the same runner.
   build-and-deploy:
+    # The type of virtual machine to run the job on. 'ubuntu-latest' is a standard choice.
     runs-on: ubuntu-latest
 
     steps:
+      # Step 1: Check out the repository code
+      # This action checks out your repository under $GITHUB_WORKSPACE,
+      # so your workflow can access its contents.
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      # Step 2: Set up the Node.js environment
+      # This action sets up a Node.js environment for use in your workflow.
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
+          # Specify the version of Node.js to use. '22' is a recent stable version.
           node-version: '22'
 
-      # Menggunakan 'npm ci' lebih cepat dan konsisten untuk CI/CD
+      # Step 3: Install project dependencies
+      # 'npm ci' is recommended for CI/CD environments because it provides faster,
+      # more reliable builds than 'npm install'. It uses the package-lock.json.
       - name: Install dependencies
         run: npm ci
 
+      # Step 4: Create a deployment package
+      # This step packages all necessary files into a single .zip file for transfer.
       - name: Archive project for deployment
-        # Menghapus file zip lama jika ada, lalu membuat yang baru
-        # Mengecualikan file yang tidak perlu di-deploy
         run: |
-          rm -f app.zip
+          # Create a zip file named 'app.zip' containing all files in the current directory.
+          # The -x flag excludes specified files/folders from the archive.
+          # We exclude .git history, development modules, GitHub workflow files, and the .env file
+          # because the .env file will be created on the server from secrets.
           zip -r app.zip . -x ".git/*" "node_modules/*" ".github/*" ".env"
 
+      # Step 5: Copy the deployment package to the EC2 server
+      # This action uses SCP (Secure Copy Protocol) to securely transfer the app.zip file.
       - name: Copy archive to EC2
         uses: appleboy/scp-action@v0.1.7
         with:
@@ -37,9 +54,11 @@ jobs:
           key: ${{ secrets.EC2_SSH_KEY }}
           port: 22
           source: "app.zip"
-          # Target adalah folder home dari user EC2
+          # The target path on the EC2 server. '~' is a shortcut for the user's home directory.
           target: "/home/${{ secrets.EC2_USER }}"
 
+      # Step 6: Deploy the application on the EC2 server
+      # This action uses SSH to execute a series of commands on the remote EC2 server.
       - name: Deploy on EC2
         uses: appleboy/ssh-action@v1.0.3
         with:
@@ -48,29 +67,30 @@ jobs:
           key: ${{ secrets.EC2_SSH_KEY }}
           port: 22
           script: |
-            # Keluar dari skrip jika ada perintah yang gagal
+            # 'set -e' ensures that the script will exit immediately if any command fails.
             set -e
 
-            # Tentukan direktori proyek
+            # Define the project directory on the server for easy reference.
             PROJECT_DIR="/home/${{ secrets.EC2_USER }}/music-discovery-project"
             
-            # Buat direktori jika belum ada
+            # Create the project directory if it doesn't already exist.
             mkdir -p $PROJECT_DIR
 
-            # 1. FIX UTAMA: Ubah kepemilikan folder ke user yang sedang login
-            # Ini akan menyelesaikan semua masalah 'Permission Denied'
+            # IMPORTANT: Fix permissions by changing the owner of the project directory
+            # to the current user. This prevents 'Permission Denied' errors.
             sudo chown -R ${{ secrets.EC2_USER }}:${{ secrets.EC2_USER }} $PROJECT_DIR
 
-            # Pindah ke direktori proyek
+            # Navigate into the project directory.
             cd $PROJECT_DIR
 
-            # 2. FIX LOGIKA: Ekstrak file zip di sini, menimpa file lama
+            # Unzip the deployment package, overwriting any existing files (-o flag).
             unzip -o "/home/${{ secrets.EC2_USER }}/app.zip"
 
-            # Hapus file zip setelah diekstrak
+            # Remove the zip file after extraction to save space.
             rm "/home/${{ secrets.EC2_USER }}/app.zip"
 
-            # Buat file .env dari secrets
+            # Create the .env file on the server using secrets stored in GitHub.
+            # This is the secure way to handle environment variables.
             cat <<EOF> .env
             JWT_SECRET_KEY='${{ secrets.JWT_SECRET_KEY }}'
             GOOGLE_APP_PASSWORD='${{ secrets.GOOGLE_APP_PASSWORD }}'
@@ -82,12 +102,12 @@ jobs:
             AWS_REGION='${{ secrets.AWS_REGION }}'
             EOF
             
-            # Install dependensi TANPA sudo, karena user sekarang memiliki folder
+            # Install only production dependencies. No need for 'sudo' because we fixed permissions.
             npm install --production
 
-            # Install/update PM2 secara global (ini butuh sudo)
+            # Install or update PM2, a process manager for Node.js. 'sudo' is needed for global install.
             sudo npm install -g pm2
 
-            # 4. FIX PM2: Gunakan 'restart' atau 'start' agar lebih aman
-            # Ini akan me-restart aplikasi jika sudah berjalan, atau memulainya jika belum ada
+            # Restart the application if it's already running, or start it if it's not.
+            # This ensures zero-downtime deployments.
             pm2 restart music-discovery-project || pm2 start server.js --name music-discovery-project
