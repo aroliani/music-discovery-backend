@@ -52,7 +52,7 @@ jobs:
             set -e
 
             # Tentukan direktori proyek
-            PROJECT_DIR="/home/${{ secrets.EC2_USER }}/music-discovery-project"
+            PROJECT_DIR="/home/${{ secrets.EC2_USER }}/music-discovery-backend"
             
             # Buat direktori jika belum ada
             mkdir -p $PROJECT_DIR
@@ -90,4 +90,4 @@ jobs:
 
             # 4. FIX PM2: Gunakan 'restart' atau 'start' agar lebih aman
             # Ini akan me-restart aplikasi jika sudah berjalan, atau memulainya jika belum ada
-            pm2 restart music-discovery-project || pm2 start server.js --name music-discovery-project
+            pm2 restart music-discovery-backend || pm2 start server.js --name music-discovery-backend
