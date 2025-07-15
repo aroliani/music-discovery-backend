@@ -1,4 +1,4 @@
-name: Deploy MusicPosts App to EC2
+name: Deploy Backend to AWS EC2
 
 on:
   push:
@@ -10,25 +10,22 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repository
+      - name: Checkout Repository Code
         uses: actions/checkout@v4
 
-      - name: Set up Node.js
+      - name: Set up Node.js Environment
         uses: actions/setup-node@v4
         with:
           node-version: '22'
 
-      - name: Install dependencies
+      - name: Install Project Dependencies
         run: npm ci
 
+      - name: Archive Project into a Zip File
+        run: |
+          zip -r app.zip . -x ".git/*" "node_modules/*" ".github/*" ".env"
 
-      - name: Remove old app.zip
-        run: rm -rf app.zip
-
-      - name: Archive project
-        run: zip -r app.zip . -x "*.git*" "node_modules/*" ".github/*"
-
-      - name: Code archive to EC2
+      - name: Copy Deployment Package to EC2
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.EC2_HOST }}
@@ -36,9 +33,9 @@ jobs:
           key: ${{ secrets.EC2_SSH_KEY }}
           port: 22
           source: "app.zip"
-          target: "~"
+          target: "/home/${{ secrets.EC2_USER }}"
 
-      - name: Deploy on EC2
+      - name: Deploy Application on EC2
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.EC2_HOST }}
@@ -47,24 +44,32 @@ jobs:
           port: 22
           script: |
             set -e
-            cd ~
-            rm -rf music-discovery-backend/
-            sudo apt install -y unzip
-            unzip -o app.zip -d music-discovery-backend
-            cd music-discovery-backend
+
+            PROJECT_DIR="/home/${{ secrets.EC2_USER }}/music-discovery-backend"
+            
+            mkdir -p $PROJECT_DIR
+
+            sudo chown -R ${{ secrets.EC2_USER }}:${{ secrets.EC2_USER }} $PROJECT_DIR
+
+            cd $PROJECT_DIR
+
+            unzip -o "/home/${{ secrets.EC2_USER }}/app.zip"
+
+            rm "/home/${{ secrets.EC2_USER }}/app.zip"
+
             cat <<EOF> .env
-            JWT_SECRET_KEY= '${{ secrets.JWT_SECRET_KEY }}'
-            GOOGLE_APP_PASSWORD= '${{ secrets.GOOGLE_APP_PASSWORD }}'
-            GOOGLE_CLIENT_ID= '${{ secrets.GOOGLE_CLIENT_ID }}'
-            GOOGLE_SECRET= '${{ secrets.GOOGLE_SECRET }}'
-            AWS_ACCESS_KEY_ID= '${{ secrets.AWS_ACCESS_KEY_ID }}'
-            AWS_SECRET_ACCESS_KEY= '${{ secrets.AWS_SECRET_ACCESS_KEY }}'
-            AWS_BUCKET_NAME= '${{ secrets.AWS_BUCKET_NAME }}'
-            AWS_REGION= '${{ secrets.AWS_REGION }}'
+            JWT_SECRET_KEY='${{ secrets.JWT_SECRET_KEY }}'
+            GOOGLE_APP_PASSWORD='${{ secrets.GOOGLE_APP_PASSWORD }}'
+            GOOGLE_CLIENT_ID='${{ secrets.GOOGLE_CLIENT_ID }}'
+            GOOGLE_SECRET='${{ secrets.GOOGLE_SECRET }}'
+            AWS_ACCESS_KEY_ID='${{ secrets.AWS_ACCESS_KEY_ID }}'
+            AWS_SECRET_ACCESS_KEY='${{ secrets.AWS_SECRET_ACCESS_KEY }}'
+            AWS_BUCKET_NAME='${{ secrets.AWS_BUCKET_NAME }}'
+            AWS_REGION='${{ secrets.AWS_REGION }}'
             EOF
             
-            sudo apt install -y nodejs npm
-            sudo npm ci
-            sudo npm i -g pm2
-            pm2 delete all || true
-            pm2 start index.js --name music-discovery-backend  
+            npm install --production
+
+            sudo npm install -g pm2
+
+            pm2 restart music-discovery-backend || pm2 start server.js --name music-discovery-backend
