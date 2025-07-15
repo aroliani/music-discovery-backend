@@ -20,8 +20,8 @@ const app = express();
 
 // Middleware
 const allowedOrigins = [
-  'http://localhost:5173', 
-  'https://music-project-frontend.netlify.app' 
+  'http://localhost:5173',
+  process.env.FRONTEND_URL // Mengambil URL frontend dari .env
 ];
 
 app.use(
@@ -37,15 +37,8 @@ app.use(
   })
 );
 app.use(express.json());
-// app.use(session({
-//   secret: 'supersecretkey',
-//   resave: false,
-//   saveUninitialized: false,
-//   cookie: { secure: false }
-// }));
 app.use(passport.initialize());
 app.use(cookieParser());
-// app.use(passport.session());
 
 // Connect MongoDB
 mongoose
@@ -59,6 +52,7 @@ mongoose
   .catch((err) => console.error("MongoDB connection error:", err));
 
 // === AUTH ROUTES ===
+// ... (Routes lain tidak perlu diubah)
 app.post("/auth/signup", async (req, res) => {
   try {
     const { username, email, password } = req.body;
@@ -108,6 +102,7 @@ app.get("/auth/logout", (req, res) => {
   res.json({ message: "Logged out" });
 });
 
+
 // === GOOGLE AUTH ROUTES ===
 app.get(
   "/auth/google",
@@ -116,7 +111,7 @@ app.get(
 
 app.get(
   "/auth/google/callback",
-  passport.authenticate("google", { session: false }), 
+  passport.authenticate("google", { session: false }),
   (req, res) => {
     let token = null;
     if (req.user) {
@@ -127,14 +122,17 @@ app.get(
         process.env.JWT_SECRET_KEY,
         { expiresIn: "1h" }
       )
-        res.cookie("token", token);
-        res.redirect(`http://localhost:5173/posts`);
+      res.cookie("token", token);
+      // FIX: Redirect ke alamat frontend produksi, bukan localhost
+      res.redirect(`${process.env.FRONTEND_URL}/posts`);
     } else {
-      res.redirect(`http://localhost:5173/auth/login?error=google-auth-failed`);
+      // FIX: Redirect ke halaman login frontend produksi jika gagal
+      res.redirect(`${process.env.FRONTEND_URL}/login?error=google-auth-failed`);
     }
   }
 );
 
+// ... (Sisa routes posts dan comments tidak perlu diubah)
 // === POSTS ROUTES ===
 app.get("/posts", async (req, res) => {
   try {
@@ -302,6 +300,7 @@ app.delete("/comments/:commentId", passport.authenticate('jwt', { session: false
   if (!comment) return res.status(404).json({ error: "Comment not found" });
   res.json({ message: "Comment deleted" });
 });
+
 
 // === Root ===
 app.get("/", (req, res) => {

@@ -37,7 +37,6 @@ passport.use(
   })
 );
 
-// JWT Strategy
 const jwtOptions = {
   jwtFromRequest: ExtractJwt.fromExtractors([
     (req) => {
@@ -64,13 +63,14 @@ passport.use(
   })
 );
 
+
 // Google Strategy
 passport.use(
   new GoogleStrategy(
     {
       clientID: process.env.GOOGLE_CLIENT_ID,
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-      callbackURL: "http://localhost:3000/auth/google/callback",
+      clientSecret: process.env.GOOGLE_SECRET,
+      callbackURL: `${process.env.BACKEND_URL}/auth/google/callback`,
     },
     async (accessToken, refreshToken, profile, done) => {
       try {
@@ -98,19 +98,5 @@ passport.use(
     }
   )
 );
-
-// Serialize & Deserialize (for session-based login)
-// passport.serializeUser((user, done) => {
-//   done(null, user._id);
-// });
-
-// passport.deserializeUser(async (id, done) => {
-//   try {
-//     const user = await User.findById(id);
-//     done(null, user);
-//   } catch (err) {
-//     done(err);
-//   }
-// });
 
 export default passport;
