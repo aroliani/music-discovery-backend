@@ -48,26 +48,18 @@ jobs:
           script: |
             set -e
 
-            # Tentukan direktori proyek
             PROJECT_DIR="/home/${{ secrets.EC2_USER }}/music-discovery-backend"
-            
-            # Buat direktori jika belum ada
+
             mkdir -p $PROJECT_DIR
 
-            # 1. FIX UTAMA: Ubah kepemilikan folder ke user yang sedang login
-            # Ini akan menyelesaikan semua masalah 'Permission Denied'
             sudo chown -R ${{ secrets.EC2_USER }}:${{ secrets.EC2_USER }} $PROJECT_DIR
 
-            # Pindah ke direktori proyek
             cd $PROJECT_DIR
 
-            # 2. FIX LOGIKA: Ekstrak file zip di sini, menimpa file lama
             unzip -o "/home/${{ secrets.EC2_USER }}/app.zip"
 
-            # Hapus file zip setelah diekstrak
             rm "/home/${{ secrets.EC2_USER }}/app.zip"
 
-            # Buat file .env dari secrets
             cd ~
             rm -rf music-discovery-backend/
             sudo apt install -y unzip
@@ -86,17 +78,16 @@ jobs:
             BACKEND_URL='${{ secrets.BACKEND_URL }}'
             EOF
             
-            # Install dependensi TANPA sudo, karena user sekarang memiliki folder
             npm install --production
 
-            # Install/update PM2 secara global (ini butuh sudo)
             sudo npm install -g pm2
 
-            # 4. FIX PM2: Gunakan 'restart' atau 'start' agar lebih aman
-            # Ini akan me-restart aplikasi jika sudah berjalan, atau memulainya jika belum ada
             pm2 restart music-discovery-backend || pm2 start server.js --name music-discovery-backend
             sudo apt install -y nodejs npm
             sudo npm ci
             sudo npm i -g pm2
             pm2 delete all || true
             pm2 start server.js --name music-discovery-backend 
+
+            docker-compose down || true
+            docker-compose up --build -d

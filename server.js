@@ -16,6 +16,7 @@ import Comment from "./models/comments.model.js";
 
 import { isSameUserValidator } from "./validators/post.validator.js";
 
+const mongoUrl = process.env.MONGO_URL || "mongodb://127.0.0.1:27017/musicdb";
 const app = express();
 
 // Middleware

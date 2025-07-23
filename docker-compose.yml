@@ -1,0 +1,16 @@
+version: '3'
+services:
+  mongodb:
+    image: mongo:6
+    container_name: mongodb
+    ports:
+      - "27017:27017"
+  music-discovery-backend:
+    build: .
+    container_name: backend
+    environment:
+      - .env
+    depends_on:
+      - mongodb
+    ports:
+      - "80:3000"
